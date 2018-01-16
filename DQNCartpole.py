@@ -8,6 +8,7 @@ import numpy as np
 import random
 import tensorflow as tf
 import gym
+import time
 
 def npNonlinear(pre_act, Nonlinear):
     '''
@@ -21,7 +22,7 @@ def npNonlinear(pre_act, Nonlinear):
         return ret_out
     elif Nonlinear == 'ReLU':
         ret_out = (pre_act > 0.)*pre_act
-        return np.asarray(ret_out,dtype=np.float32)
+        return np.asarray(ret_out)
     else:
         raise ValueError('Unexpected Nonlinear layer specifier!')
 
@@ -53,17 +54,17 @@ class DQNagentFC:
         for idx, units_num in enumerate(hidden_units_num):
             with tf.variable_scope('hidden_layer_'+str(idx+1)):
                 if idx ==0:
-                    Weights_init = tf.constant(np.random.normal(0.0,0.1,
+                    Weights_init = tf.constant(np.random.uniform(-1,1,
                             size=[self.dim_in,self.hidden_units_num[idx]]))
                     Weights = tf.get_variable('W',initializer=Weights_init)
-                    Bias_init = tf.constant(np.random.normal(0.0,0.1,size=[self.hidden_units_num[idx]]))
+                    Bias_init = tf.constant(0.,shape=[self.hidden_units_num[idx]],dtype=tf.float64)
                     Bias = tf.get_variable('b',initializer=Bias_init)
                     pre_act = tf.nn.bias_add(tf.matmul(self.input_ph,Weights), Bias)
                 else:
-                    Weights_init = tf.constant(np.random.normal(0.0,0.1,
+                    Weights_init = tf.constant(np.random.uniform(-1,1,
                             size=[self.hidden_units_num[idx-1],self.hidden_units_num[idx]]))
                     Weights = tf.get_variable('W',initializer=Weights_init)
-                    Bias_init = tf.constant(np.random.normal(0.0,0.1,size=[self.hidden_units_num[idx]]))
+                    Bias_init = tf.constant(0.,shape=[self.hidden_units_num[idx]],dtype=tf.float64)
                     Bias = tf.get_variable('b',initializer=Bias_init)
                     pre_act = tf.nn.bias_add(tf.matmul(out,Weights), Bias)
                     
@@ -73,11 +74,10 @@ class DQNagentFC:
                     out = tf.nn.relu(pre_act,name='out')
                     
         with tf.variable_scope('output_final'):
-            Weights_init = tf.constant(np.random.normal(0.0,0.1,
+            Weights_init = tf.constant(np.random.uniform(-1,1,
                     size=[self.hidden_units_num[self.layerNum-1],self.dim_out]))
             Weights = tf.get_variable('W',initializer=Weights_init)
-            Bias_init = tf.constant(np.random.normal(0.0,0.1,
-                    size=[self.dim_out]))
+            Bias_init = tf.constant(0.,shape=[self.dim_out],dtype=tf.float64)
             Bias = tf.get_variable('b',initializer=Bias_init)
             pre_act = tf.nn.bias_add(tf.matmul(out,Weights), Bias)
         self.output = pre_act
@@ -137,6 +137,8 @@ class DQNagentFC:
         
         target_score = np.dot(out,self.target_params['output_final_W']) 
         + self.target_params['output_final_b']
+#        print(target_score.shape)
+#        time.sleep(1)
         target_score = np.max(target_score, axis=1)
         return target_score
     
@@ -228,19 +230,19 @@ class Policy:
 env = gym.make('CartPole-v0')
 learning_rate = 0.001
 discount_rate = 0.99
-global_train_step = 10000
+global_train_step = 20000
 target_update_step = 100
 replay_memory_size = 1000
 batch_size = 32
 dim_in = env.observation_space.shape[0]
 dim_out = env.action_space.n
-hidden_units_num = [10,10,10]
-NonLinear = ['sigmoid','sigmoid','sigmoid']
+hidden_units_num = [16,16]
+NonLinear = ['ReLU','ReLU']
 
 
 # build computation graph
 dqnCartPoleAgent = DQNagentFC(dim_in,dim_out,hidden_units_num,NonLinear)
-policy = Policy(1,0.05,8000)
+policy = Policy(1,0.1,1000)
 replayMemory = ReplayMemory(dim_in, replay_memory_size)
 target_ph = tf.placeholder(dtype=tf.float64,shape=[None],name='target_score') # feed target_score
 reward_ph = tf.placeholder(dtype=tf.float64,shape=[None],name='reward')
@@ -248,8 +250,9 @@ terminal_ph = tf.placeholder(dtype=tf.float64,shape=[None],name='terminal')
 state_ph = tf.placeholder(dtype=tf.float64,shape=[None, dim_in],name='state')
 action_ph = tf.placeholder(dtype=tf.int32,shape=[None, 2],name='action')
 
-update_target = reward_ph + discount_rate*terminal_ph*target_ph
-loss = tf.reduce_mean(0.5*tf.square(update_target - tf.gather_nd(dqnCartPoleAgent.output,action_ph)))
+update_target = reward_ph + discount_rate*(1-terminal_ph)*target_ph
+#print(tf.gather_nd(dqnCartPoleAgent.output,action_ph))
+loss = tf.reduce_mean(tf.square(update_target - tf.gather_nd(dqnCartPoleAgent.output,action_ph)))
 
 train_op = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(loss)
 
@@ -268,6 +271,7 @@ for i in range(0, batch_size):
         state = next_state
 state = env.reset()
 reward_rec = 0
+episode_counter = 0
 with tf.Session() as sess:
     # training process
     sess.run(tf.global_variables_initializer())
@@ -277,6 +281,7 @@ with tf.Session() as sess:
         # update target when the steps condition is satisfied
         if train_step % target_update_step == 0:
             dqnCartPoleAgent.getTarget(sess)
+            print('updating target...')
             
             
         
@@ -291,7 +296,9 @@ with tf.Session() as sess:
         replayMemory.addSample(state,action,reward,next_state,terminal)
         if terminal:
             state = env.reset()
-            print('reward obtained from last episode: %d'%(reward_rec))
+            episode_counter += 1
+            print('reward obtained from No. %d episode: %d'%(episode_counter,reward_rec))
+            print('current episode %.6f'%policy.current_epsilon)
             reward_rec =0
         else:
             state = next_state
@@ -308,6 +315,7 @@ with tf.Session() as sess:
         train_step +=1
         if train_step % 20 ==0:
             print('training step %.4f with loss %.4f'%(train_step,loss_show))
+            time.sleep(0.5)
     
 
 
