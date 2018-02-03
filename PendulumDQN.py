@@ -232,7 +232,10 @@ class Policy:
 # main function begins here
 # setting hyperparameters here
 # set up learning environment and training agent
-env = gym.make('Pendulum-v0')
+'''
+There is no environment called 'Pendulum-v1' in original gym please run __init__.py to register it
+'''
+env = gym.make('Pendulum-v1')
 learning_rate = 0.001
 discount_rate = 0.99
 global_train_step = 20000
@@ -241,8 +244,8 @@ replay_memory_size = 1000
 batch_size = 32
 dim_in = env.observation_space.shape[0]
 dim_out = 3 # number for us to choose [-max_torque,0,max_torque]
-hidden_units_num = [16,16]
-NonLinear = ['ReLU','ReLU']
+hidden_units_num = [16,16,16]
+NonLinear = ['ReLU','ReLU','ReLU']
 
 
 # build computation graph
@@ -301,6 +304,7 @@ with tf.Session() as sess:
         elif action == 2:
             action_exec = env.action_space.high
         next_state, reward, terminal,_ = env.step(action_exec)
+        env.render()
         action = np.asarray(action,dtype=np.int32).reshape((1,))
         reward = np.asarray(reward).reshape((1,))
         terminal = np.asarray(terminal,dtype=np.int32).reshape((1,))
