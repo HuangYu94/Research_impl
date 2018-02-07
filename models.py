@@ -12,7 +12,7 @@ import tensorflow as tf
 
 class NNagentFC:
     def __init__(self,name_scope,dim_in=4,dim_out=2,hidden_units_num=[10,10,10],
-                 NonLinear=['sigmoid','sigmoid','sigmoid']):
+                 NonLinear=['sigmoid','sigmoid','sigmoid'],drop_out=False):
         '''
         Basic model to solve Deep RL problem.
         Make sure you correctly entered the name_scope
@@ -25,13 +25,17 @@ class NNagentFC:
             raise ValueError('layer number is not equal to Nonlinear layer number')
         
         self.update_step = 0
+        self.is_continuous = False
         self.name_scope = name_scope
         self.dim_in = dim_in
         self.dim_out = dim_out
         self.hidden_units_num = hidden_units_num
         self.NonLinear = NonLinear
         self.layerNum = len(hidden_units_num)
-        self.input_ph = tf.placeholder(dtype=tf.float64,shape=[None,dim_in],name='state_input')
+        self.input_ph = tf.placeholder(dtype=tf.float64,shape=[None,dim_in],name=name_scope+'state_input')
+        self.drop_out_rate = tf.placeholder(dtype=tf.float64,shape=())
+        self.param = []
+        self.l2_loss = 0
         for idx, units_num in enumerate(hidden_units_num):
             with tf.variable_scope(self.name_scope+'_hidden_layer_'+str(idx+1)):
                 if idx ==0:
@@ -54,6 +58,12 @@ class NNagentFC:
                 elif self.NonLinear[idx] == 'ReLU':
                     out = tf.nn.relu(pre_act,name='out')
                     
+                if drop_out:
+                    out = tf.nn.dropout(out,keep_prob=self.drop_out_rate)
+                self.param.append(Weights)
+                self.l2_loss += tf.nn.l2_loss(Weights)
+                self.param.append(Bias)
+                    
         with tf.variable_scope(self.name_scope+'_output_final'):
             Weights_init = tf.constant(np.random.uniform(-1,1,
                     size=[self.hidden_units_num[self.layerNum-1],self.dim_out]))
@@ -61,6 +71,9 @@ class NNagentFC:
             Bias_init = tf.constant(0.,shape=[self.dim_out],dtype=tf.float64)
             Bias = tf.get_variable('b',initializer=Bias_init)
             pre_act = tf.nn.bias_add(tf.matmul(out,Weights), Bias)
+            self.param.append(Weights)
+            self.l2_loss += tf.nn.l2_loss(Weights)
+            self.param.append(Bias)
         self.output = pre_act
     
     def evalCurrentState(self, state, sess):
@@ -68,7 +81,8 @@ class NNagentFC:
         evaluate current state and return score to each action
         '''
         state = state.reshape((1,self.dim_in))
-        action_score = sess.run(self.output,feed_dict={self.input_ph:state})
+        action_score = sess.run(self.output,feed_dict={self.input_ph:state,
+                                                       self.drop_out_rate:1.0})
         return action_score
     
     def getTarget(self, sess):
@@ -147,6 +161,8 @@ class NNagentFC:
         + self.target_params['output_final_b']
 #        print(target_score.shape)
 #        time.sleep(1)
+        if self.is_continuous:
+            return target_score
         target_score = np.max(target_score, axis=1)
         return target_score
     
@@ -172,6 +188,8 @@ class ReplayMemory:
             
         elif self.current_size < self.mem_length:
             self.state_pool = np.concatenate((self.state_pool, state), axis=0)
+#            print(self.action_pool)
+#            print(action)
             self.action_pool = np.concatenate((self.action_pool, action), axis=0)
             self.reward_pool = np.concatenate((self.reward_pool, reward), axis=0)
             self.next_state_pool = np.concatenate((self.next_state_pool, next_state), axis=0)

@@ -10,6 +10,7 @@ import random
 import tensorflow as tf
 import gym
 import time
+from gym import wrappers
 
 def npNonlinear(pre_act, Nonlinear):
     '''
@@ -236,9 +237,10 @@ class Policy:
 There is no environment called 'Pendulum-v1' in original gym please run __init__.py to register it
 '''
 env = gym.make('Pendulum-v1')
+#env = wrappers.Monitor(env,'.\\video\\pendulum_swingup_balance_1')
 learning_rate = 0.001
 discount_rate = 0.99
-global_train_step = 20000
+global_train_step = 15000
 target_update_step = 100
 replay_memory_size = 1000
 batch_size = 32
@@ -330,4 +332,8 @@ with tf.Session() as sess:
         train_step +=1
         if train_step % 20 ==0:
             print('training step %.4f with loss %.4f'%(train_step,loss_show))
-            time.sleep(0.5)
+#            time.sleep(0.5)
+
+#env.close()
+#gym.upload('.\\video\\pendulum_swingup_balance_1',api_key='blah')
+            
