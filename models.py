@@ -281,6 +281,7 @@ class Policy_cont:
                                            self.process_noise) + self.random_process_param['sigma']*np.random.randn(self.process_noise.shape[0],
                                                              self.process_noise.shape[1])
         self.scale = self.scale*self.noise_param['decay_rate']
+#        print(self.process_noise*self.scale)
         return opt_action+self.process_noise*self.scale
     
     def reset(self):

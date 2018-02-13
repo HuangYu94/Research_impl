@@ -236,7 +236,7 @@ class Policy:
 '''
 There is no environment called 'Pendulum-v1' in original gym please run __init__.py to register it
 '''
-env = gym.make('Pendulum-v1')
+env = gym.make('Acrobot-v1')
 #env = wrappers.Monitor(env,'.\\video\\pendulum_swingup_balance_1')
 learning_rate = 0.001
 discount_rate = 0.99

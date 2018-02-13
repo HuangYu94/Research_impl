@@ -227,22 +227,22 @@ class Policy:
 # main function begins here
 # setting hyperparameters here
 # set up learning environment and training agent
-env = gym.make('CartPole-v0')
+env = gym.make('Pendulum-v0')
 learning_rate = 0.001
 discount_rate = 0.99
-global_train_step = 20000
+global_train_step = 40000
 target_update_step = 100
-replay_memory_size = 1000
-batch_size = 32
+replay_memory_size = 10000
+batch_size = 128
 dim_in = env.observation_space.shape[0]
 dim_out = env.action_space.n
-hidden_units_num = [16,16]
-NonLinear = ['ReLU','ReLU']
+hidden_units_num = [16,16,16]
+NonLinear = ['ReLU','ReLU','ReLU']
 
 
 # build computation graph
 dqnCartPoleAgent = DQNagentFC(dim_in,dim_out,hidden_units_num,NonLinear)
-policy = Policy(1,0.1,1000)
+policy = Policy(1,0.1,4000)
 replayMemory = ReplayMemory(dim_in, replay_memory_size)
 target_ph = tf.placeholder(dtype=tf.float64,shape=[None],name='target_score') # feed target_score
 reward_ph = tf.placeholder(dtype=tf.float64,shape=[None],name='reward')
@@ -290,6 +290,7 @@ with tf.Session() as sess:
         action = policy.pickAction(action_score)
 #        print(action)
         next_state, reward, terminal,_ = env.step(action)
+        env.render()
         action = np.asarray(action,dtype=np.int32).reshape((1,))
         reward = np.asarray(reward).reshape((1,))
         terminal = np.asarray(terminal,dtype=np.int32).reshape((1,))
@@ -315,9 +316,9 @@ with tf.Session() as sess:
         train_step +=1
         if train_step % 20 ==0:
             print('training step %.4f with loss %.4f'%(train_step,loss_show))
-            time.sleep(0.5)
+#            time.sleep(0.5)
     
-
+env.close()
 
 
 
